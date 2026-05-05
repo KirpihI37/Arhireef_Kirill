@@ -1,127 +1,153 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import json
+import os
 
-MOVIES_FILE = 'movies.json'
+# Глобальные переменные
+books = []
 
-def load_movies():
-    try:
-        with open(MOVIES_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
+# Функции для работы с JSON
+def load_books():
+    global books
+    if os.path.exists('books.json'):
+        with open('books.json', 'r', encoding='utf-8') as f:
+            books = json.load(f)
+    else:
+        books = []
 
-def save_movies(data):
-    with open(MOVIES_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def save_books():
+    with open('books.json', 'w', encoding='utf-8') as f:
+        json.dump(books, f, ensure_ascii=False, indent=4)
 
-def validate_input():
+# Функция добавления книги
+def add_book():
     title = entry_title.get().strip()
+    author = entry_author.get().strip()
     genre = entry_genre.get().strip()
-    year = entry_year.get().strip()
-    rating = entry_rating.get().strip()
+    pages = entry_pages.get().strip()
 
-    if not title or not genre:
-        messagebox.showerror("Ошибка", "Название и жанр не должны быть пустыми.")
-        return False
+    # Проверка корректности
+    if not title or not author or not genre or not pages:
+        messagebox.showerror("Ошибка", "Все поля должны быть заполнены")
+        return
+    if not pages.isdigit():
+        messagebox.showerror("Ошибка", "Количество страниц должно быть числом")
+        return
 
-    if not year.isdigit() or not (1800 <= int(year) <= 2100):
-        messagebox.showerror("Ошибка", "Год должен быть числом от 1800 до 2100.")
-        return False
+    book = {
+        "title": title,
+        "author": author,
+        "genre": genre,
+        "pages": int(pages)
+    }
+    books.append(book)
+    refresh_treeview()
+    clear_entries()
 
-    if not (rating.replace('.', '', 1).isdigit() and 0 <= float(rating) <= 10):
-        messagebox.showerror("Ошибка", "Рейтинг должен быть числом от 0 до 10.")
-        return False
-    return True
+def clear_entries():
+    entry_title.delete(0, tk.END)
+    entry_author.delete(0, tk.END)
+    entry_genre.delete(0, tk.END)
+    entry_pages.delete(0, tk.END)
 
-def add_movie():
-    if validate_input():
-        movie = {
-            "title": entry_title.get(),
-            "genre": entry_genre.get(),
-            "year": int(entry_year.get()),
-            "rating": float(entry_rating.get())
-        }
-        movies.append(movie)
-        save_movies(movies)
-        refresh_table()
-        clear_fields()
-
-def refresh_table(filter_genre=None, filter_year=None):
+# Функция обновления таблицы
+def refresh_treeview(filtered_books=None):
     for item in tree.get_children():
         tree.delete(item)
-    for movie in movies:
-        if filter_genre and movie["genre"].lower() != filter_genre.lower():
-            continue
-        if filter_year and movie["year"] != int(filter_year):
-            continue
-        tree.insert("", "end", values=(movie["title"], movie["genre"], movie["year"], movie["rating"]))
+    data = filtered_books if filtered_books is not None else books
+    for book in data:
+        tree.insert('', tk.END, values=(book['title'], book['author'], book['genre'], book['pages']))
 
-def apply_filters():
-    genre = entry_filter_genre.get().strip() if entry_filter_genre.get().strip() else None
-    year = entry_filter_year.get().strip() if entry_filter_year.get().strip() else None
-    refresh_table(genre, year)
+# Фильтрация
+def filter_books():
+    genre_filter = filter_genre_var.get()
+    pages_filter = filter_pages_var.get()
 
-def clear_fields():
-    entry_title.delete(0, tk.END)
-    entry_genre.delete(0, tk.END)
-    entry_year.delete(0, tk.END)
-    entry_rating.delete(0, tk.END)
+    filtered = books
+    if genre_filter != "Все":
+        filtered = [b for b in filtered if b['genre'] == genre_filter]
+    if pages_filter:
+        try:
+            pages_threshold = int(pages_filter)
+            filtered = [b for b in filtered if b['pages'] > pages_threshold]
+        except ValueError:
+            messagebox.showerror("Ошибка", "Порог страниц должен быть числом")
+            return
+    refresh_treeview(filtered)
 
-movies = load_movies()
+# Сохранить и загрузить
+def save_data():
+    save_books()
 
+def load_data():
+    load_books()
+    refresh_treeview()
+
+# Создание GUI
 root = tk.Tk()
-root.title("Movie Library")
-root.geometry("800x500")
+root.title("Book Tracker")
 
-tab_control = ttk.Notebook(root)
-tab_main = ttk.Frame(tab_control)
-tab_filter = ttk.Frame(tab_control)
+# Ввод данных
+frame_input = tk.Frame(root)
+frame_input.pack(padx=10, pady=10)
 
-tab_control.add(tab_main, text="Добавить фильм")
-tab_control.add(tab_filter, text="Фильтр")
-tab_control.pack(expand=1, fill="both")
+tk.Label(frame_input, text="Название книги").grid(row=0, column=0)
+entry_title = tk.Entry(frame_input)
+entry_title.grid(row=0, column=1)
 
-# Вкладка "Добавить фильм"
-tk.Label(tab_main, text="Название:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-entry_title = tk.Entry(tab_main, width=40)
-entry_title.grid(row=0, column=1, padx=5, pady=5)
+tk.Label(frame_input, text="Автор").grid(row=1, column=0)
+entry_author = tk.Entry(frame_input)
+entry_author.grid(row=1, column=1)
 
-tk.Label(tab_main, text="Жанр:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-entry_genre = tk.Entry(tab_main, width=40)
-entry_genre.grid(row=1, column=1, padx=5, pady=5)
+tk.Label(frame_input, text="Жанр").grid(row=2, column=0)
+entry_genre = tk.Entry(frame_input)
+entry_genre.grid(row=2, column=1)
 
-tk.Label(tab_main, text="Год выпуска:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
-entry_year = tk.Entry(tab_main, width=40)
-entry_year.grid(row=2, column=1, padx=5, pady=5)
+tk.Label(frame_input, text="Количество страниц").grid(row=3, column=0)
+entry_pages = tk.Entry(frame_input)
+entry_pages.grid(row=3, column=1)
 
-tk.Label(tab_main, text="Рейтинг (0-10):").grid(row=3, column=0, padx=5, pady=5, sticky="w")
-entry_rating = tk.Entry(tab_main, width=40)
-entry_rating.grid(row=3, column=1, padx=5, pady=5)
+btn_add = tk.Button(frame_input, text="Добавить книгу", command=add_book)
+btn_add.grid(row=4, column=0, columnspan=2, pady=5)
 
-btn_add = ttk.Button(tab_main, text="Добавить фильм", command=add_movie)
-btn_add.grid(row=4, column=0, columnspan=2, pady=10)
+# Таблица
+columns = ('title', 'author', 'genre', 'pages')
+tree = ttk.Treeview(root, columns=columns, show='headings')
+for col in columns:
+    tree.heading(col, text=col.capitalize())
 
-tree = ttk.Treeview(tab_main, columns=("Название", "Жанр", "Год", "Рейтинг"), show="headings")
-for col in ("Название", "Жанр", "Год", "Рейтинг"):
-    tree.heading(col, text=col)
-tree.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
+tree.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-scrollbar = ttk.Scrollbar(tab_main, orient="vertical", command=tree.yview)
-scrollbar.grid(row=5, column=2, sticky="ns")
-tree.configure(yscrollcommand=scrollbar.set)
+# Фильтр
+frame_filter = tk.Frame(root)
+frame_filter.pack(padx=10, pady=5)
 
-# Вкладка "Фильтр"
-tk.Label(tab_filter, text="Жанр для фильтрации:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-entry_filter_genre = tk.Entry(tab_filter, width=40)
-entry_filter_genre.grid(row=0, column=1, padx=5, pady=5)
+tk.Label(frame_filter, text="Фильтр по жанру").grid(row=0, column=0)
+genres = ["Все"]
+# Можно расширить список жанров автоматически
+genres += list({b['genre'] for b in books})
+filter_genre_var = tk.StringVar(value="Все")
+genre_menu = ttk.Combobox(frame_filter, textvariable=filter_genre_var, values=genres)
+genre_menu.grid(row=0, column=1)
+genre_menu.bind("<<ComboboxSelected>>", lambda e: filter_books())
 
-tk.Label(tab_filter, text="Год для фильтрации:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-entry_filter_year = tk.Entry(tab_filter, width=40)
-entry_filter_year.grid(row=1, column=1, padx=5, pady=5)
+tk.Label(frame_filter, text="Показать книги с количеством страниц больше").grid(row=0, column=2)
+filter_pages_var = tk.StringVar()
+entry_filter_pages = tk.Entry(frame_filter, textvariable=filter_pages_var)
+entry_filter_pages.grid(row=0, column=3)
 
-btn_apply = ttk.Button(tab_filter, text="Применить фильтр", command=apply_filters)
-btn_apply.grid(row=2, column=0, columnspan=2, pady=10)
+btn_filter = tk.Button(frame_filter, text="Применить фильтр", command=filter_books)
+btn_filter.grid(row=0, column=4, padx=5)
 
-refresh_table()
+# Загрузка данных при запуске
+load_books()
+refresh_treeview()
+
+# Сохранение данных при закрытии
+def on_closing():
+    save_books()
+    root.destroy()
+
+root.protocol("WM_DELETE_WINDOW", on_closing)
+
 root.mainloop()
