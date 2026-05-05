@@ -1,151 +1,99 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
+import random
 import json
 import os
 
-# Глобальные переменные
-books = []
+# Предопределённый список цитат
+quotes = [
+    {"text": "Будь собой; все остальные уже заняты.", "author": "Оскар Уайльд", "topic": "саморазвитие"},
+    {"text": "Жизнь — это то, что происходит, пока ты строишь планы.", "author": "Джон Леннон", "topic": "жизнь"},
+    {"text": "Лучше зажечь свечу, чем проклинать тьму.", "author": "Конфуций", "topic": "мудрость"},
+    {"text": "Успех — это сумма маленьких усилий, повторяемых день за днём.", "author": "Роберт Колльер", "topic": "успех"},
+    {"text": "Образование — это самое мощное оружие, которое вы можете использовать, чтобы изменить мир.", "author": "Нельсон Мандела", "topic": "образование"},
+]
 
-# Функции для работы с JSON
-def load_books():
-    global books
-    if os.path.exists('books.json'):
-        with open('books.json', 'r', encoding='utf-8') as f:
-            books = json.load(f)
-    else:
-        books = []
+history = []
 
-def save_books():
-    with open('books.json', 'w', encoding='utf-8') as f:
-        json.dump(books, f, ensure_ascii=False, indent=4)
+def load_history():
+    global history
+    if os.path.exists('history.json'):
+        with open('history.json', 'r', encoding='utf-8') as f:
+            history = json.load(f)
 
-# Функция добавления книги
-def add_book():
-    title = entry_title.get().strip()
-    author = entry_author.get().strip()
-    genre = entry_genre.get().strip()
-    pages = entry_pages.get().strip()
+def save_history():
+    with open('history.json', 'w', encoding='utf-8') as f:
+        json.dump(history, f, ensure_ascii=False, indent=4)
 
-    # Проверка корректности
-    if not title or not author or not genre or not pages:
-        messagebox.showerror("Ошибка", "Все поля должны быть заполнены")
-        return
-    if not pages.isdigit():
-        messagebox.showerror("Ошибка", "Количество страниц должно быть числом")
-        return
+def generate_quote():
+    quote = random.choice(quotes)
+    display_quote(quote)
+    history.append(quote)
+    refresh_history()
 
-    book = {
-        "title": title,
-        "author": author,
-        "genre": genre,
-        "pages": int(pages)
-    }
-    books.append(book)
-    refresh_treeview()
-    clear_entries()
+def display_quote(quote):
+    label_quote.config(text=f'"{quote["text"]}"\n\n- {quote["author"]} ({quote["topic"]})')
 
-def clear_entries():
-    entry_title.delete(0, tk.END)
-    entry_author.delete(0, tk.END)
-    entry_genre.delete(0, tk.END)
-    entry_pages.delete(0, tk.END)
+def refresh_history(filtered=None):
+    listbox_history.delete(0, tk.END)
+    data = filtered if filtered is not None else history
+    for q in data:
+        listbox_history.insert(tk.END, f'"{q["text"]}" - {q["author"]} ({q["topic"]})')
 
-# Функция обновления таблицы
-def refresh_treeview(filtered_books=None):
-    for item in tree.get_children():
-        tree.delete(item)
-    data = filtered_books if filtered_books is not None else books
-    for book in data:
-        tree.insert('', tk.END, values=(book['title'], book['author'], book['genre'], book['pages']))
+def filter_history():
+    author_filter = entry_author_filter.get().strip()
+    topic_filter = entry_topic_filter.get().strip()
 
-# Фильтрация
-def filter_books():
-    genre_filter = filter_genre_var.get()
-    pages_filter = filter_pages_var.get()
+    filtered = history
+    if author_filter:
+        filtered = [q for q in filtered if q['author'].lower() == author_filter.lower()]
+    if topic_filter:
+        filtered = [q for q in filtered if q['topic'].lower() == topic_filter.lower()]
 
-    filtered = books
-    if genre_filter != "Все":
-        filtered = [b for b in filtered if b['genre'] == genre_filter]
-    if pages_filter:
-        try:
-            pages_threshold = int(pages_filter)
-            filtered = [b for b in filtered if b['pages'] > pages_threshold]
-        except ValueError:
-            messagebox.showerror("Ошибка", "Порог страниц должен быть числом")
-            return
-    refresh_treeview(filtered)
+    refresh_history(filtered)
 
-# Сохранить и загрузить
-def save_data():
-    save_books()
-
-def load_data():
-    load_books()
-    refresh_treeview()
-
-# Создание GUI
+# GUI
 root = tk.Tk()
-root.title("Book Tracker")
+root.title("Random Quote Generator")
 
-# Ввод данных
-frame_input = tk.Frame(root)
-frame_input.pack(padx=10, pady=10)
+# Текущая цитата
+frame_current = tk.Frame(root)
+frame_current.pack(padx=10, pady=10)
 
-tk.Label(frame_input, text="Название книги").grid(row=0, column=0)
-entry_title = tk.Entry(frame_input)
-entry_title.grid(row=0, column=1)
+label_quote = tk.Label(frame_current, text="", wraplength=400, justify='center', font=('Arial', 14))
+label_quote.pack()
 
-tk.Label(frame_input, text="Автор").grid(row=1, column=0)
-entry_author = tk.Entry(frame_input)
-entry_author.grid(row=1, column=1)
+btn_generate = tk.Button(root, text="Сгенерировать цитату", command=generate_quote)
+btn_generate.pack(pady=5)
 
-tk.Label(frame_input, text="Жанр").grid(row=2, column=0)
-entry_genre = tk.Entry(frame_input)
-entry_genre.grid(row=2, column=1)
+# История
+frame_history = tk.Frame(root)
+frame_history.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-tk.Label(frame_input, text="Количество страниц").grid(row=3, column=0)
-entry_pages = tk.Entry(frame_input)
-entry_pages.grid(row=3, column=1)
+tk.Label(frame_history, text="История").grid(row=0, column=0, columnspan=2)
 
-btn_add = tk.Button(frame_input, text="Добавить книгу", command=add_book)
-btn_add.grid(row=4, column=0, columnspan=2, pady=5)
-
-# Таблица
-columns = ('title', 'author', 'genre', 'pages')
-tree = ttk.Treeview(root, columns=columns, show='headings')
-for col in columns:
-    tree.heading(col, text=col.capitalize())
-
-tree.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+listbox_history = tk.Listbox(frame_history, height=10, width=80)
+listbox_history.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
 
 # Фильтр
-frame_filter = tk.Frame(root)
-frame_filter.pack(padx=10, pady=5)
+tk.Label(frame_history, text="Фильтр по автору").grid(row=2, column=0, sticky='e')
+entry_author_filter = tk.Entry(frame_history)
+entry_author_filter.grid(row=2, column=1, sticky='w')
 
-tk.Label(frame_filter, text="Фильтр по жанру").grid(row=0, column=0)
-genres = ["Все"]
-# Можно расширить список жанров автоматически
-genres += list({b['genre'] for b in books})
-filter_genre_var = tk.StringVar(value="Все")
-genre_menu = ttk.Combobox(frame_filter, textvariable=filter_genre_var, values=genres)
-genre_menu.grid(row=0, column=1)
-genre_menu.bind("<<ComboboxSelected>>", lambda e: filter_books())
+tk.Label(frame_history, text="Фильтр по теме").grid(row=3, column=0, sticky='e')
+entry_topic_filter = tk.Entry(frame_history)
+entry_topic_filter.grid(row=3, column=1, sticky='w')
 
-tk.Label(frame_filter, text="Показать книги с количеством страниц больше").grid(row=0, column=2)
-filter_pages_var = tk.StringVar()
-entry_filter_pages = tk.Entry(frame_filter, textvariable=filter_pages_var)
-entry_filter_pages.grid(row=0, column=3)
+btn_filter = tk.Button(frame_history, text="Применить фильтр", command=filter_history)
+btn_filter.grid(row=4, column=0, columnspan=2, pady=5)
 
-btn_filter = tk.Button(frame_filter, text="Применить фильтр", command=filter_books)
-btn_filter.grid(row=0, column=4, padx=5)
+# Загрузка истории при запуске
+load_history()
+refresh_history()
 
-# Загрузка данных при запуске
-load_books()
-refresh_treeview()
-
-# Сохранение данных при закрытии
+# Сохраняем историю при закрытии
 def on_closing():
-    save_books()
+    save_history()
     root.destroy()
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
